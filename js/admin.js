@@ -80,6 +80,7 @@ function carregarFilaAdmin(dataSelecionada) {
                             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                                 ${!isCortando ? `<button onclick="alterarStatus('${id}', 'cortando')" style="flex: 1; background-color: #d4af37; color: black;">✂️ Iniciar</button>` : ''}
                                 <button onclick="alterarStatus('${id}', 'concluido')" class="btn-success" style="flex: 1;">✅ Concluir</button>
+                                <button onclick="alterarStatus('${id}', 'nao_pago')" style="flex: 1; background: linear-gradient(110deg, #e67e22, #b9580c); color: white; border: 0; border-radius: 4px 9px 4px 9px; font-weight: 700;">💸 Não Pago</button>
                                 <button onclick="alterarStatus('${id}', 'ausente')" class="btn-danger" style="flex: 1;">❌ Ausente</button>
                             </div>
                         </div>
@@ -102,7 +103,7 @@ if (dataFilaAdmin) {
     });
 }
 
-// Função global para atualizar o status e contabilizar concluídos no Firestore
+// Função global para atualizar o status no Firestore
 window.alterarStatus = async function (id, novoStatus) {
     const clienteRef = doc(db, "fila", id);
     try {
@@ -112,6 +113,8 @@ window.alterarStatus = async function (id, novoStatus) {
 
         if (novoStatus === 'concluido') {
             mostrarNotificacao("Atendimento concluído e contabilizado no Financeiro!", "success");
+        } else if (novoStatus === 'nao_pago') {
+            mostrarNotificacao("Movido para Não Pagos (não entra no Financeiro até confirmar).", "info");
         } else if (novoStatus === 'cortando') {
             mostrarNotificacao("Atendimento iniciado!", "info");
         } else if (novoStatus === 'ausente') {
@@ -124,7 +127,96 @@ window.alterarStatus = async function (id, novoStatus) {
 }
 
 // ==========================================
-// 2. FINANCEIRO E CONTADOR DE ATENDIMENTOS (DIÁRIO, SEMANAL E MENSAL)
+// 1.5. ABA DE NÃO PAGOS (PENDÊNCIAS)
+// ==========================================
+const listaNaoPagosAdmin = document.getElementById('listaNaoPagosAdmin');
+
+function carregarNaoPagosAdmin() {
+    const filaRef = collection(db, "fila");
+    const q = query(filaRef, where("status", "==", "nao_pago"));
+
+    onSnapshot(q, (snapshot) => {
+        if (!listaNaoPagosAdmin) return;
+        listaNaoPagosAdmin.innerHTML = '';
+
+        let somaPendente = 0;
+        let totalClientesPendentes = 0;
+
+        // Ordena do mais recente para o mais antigo no cliente
+        const docsOrdenados = snapshot.docs.sort((a, b) => {
+            const tA = a.data().timestamp ? a.data().timestamp.seconds : 0;
+            const tB = b.data().timestamp ? b.data().timestamp.seconds : 0;
+            return tB - tA;
+        });
+
+        docsOrdenados.forEach((documento) => {
+            const cliente = documento.data();
+            const id = documento.id;
+
+            const totalCliente = cliente.servicos.reduce((acc, serv) => acc + serv.valor, 0);
+            const servicosNomes = cliente.servicos.map(s => s.nome).join(', ');
+
+            somaPendente += totalCliente;
+            totalClientesPendentes++;
+
+            const partes = cliente.data ? cliente.data.split('-') : [];
+            const dataFormatada = partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : (cliente.data || '');
+
+            const numeroLimpo = cliente.whatsapp ? cliente.whatsapp.replace(/\D/g, '') : '';
+            const mensagemCobranca = encodeURIComponent(`Olá ${cliente.nome}, tudo bem? Passando para lembrar do atendimento (${servicosNomes}) do dia ${dataFormatada} no valor de R$ ${totalCliente.toFixed(2)} na Barbearia Carlos Oliverr.`);
+
+            const btnWhatsapp = cliente.whatsapp ?
+                `<a href="https://wa.me/55${numeroLimpo}?text=${mensagemCobranca}" target="_blank" style="flex: 1; min-width: 140px; text-align: center; background: linear-gradient(135deg, #25D366, #128C7E); color: white; padding: 12px 14px; border-radius: 4px 9px 4px 9px; font-weight: bold; text-decoration: none;">
+                    💬 Cobrar no WhatsApp
+                </a>` : '';
+
+            listaNaoPagosAdmin.innerHTML += `
+                <div class="cliente-card" style="border-left-color: #e67e22 !important;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <h3>${cliente.nome}</h3>
+                        <span style="color: #f39c12; font-weight: 700; font-size: 0.85rem;">🗓️ ${dataFormatada}</span>
+                    </div>
+                    <p style="margin: 5px 0; color: #a0a0a0;">📱 ${cliente.whatsapp || 'Não informado'}</p>
+                    <p>Serviços: ${servicosNomes} — <strong style="color: #f39c12;">R$ ${totalCliente.toFixed(2)}</strong></p>
+                    <p>Status: <strong style="color: #e67e22;">💸 PAGAMENTO PENDENTE</strong></p>
+                    
+                    <div class="acoes" style="margin-top: 15px;">
+                        ${btnWhatsapp}
+                        <button onclick="confirmarPagamento('${id}')" class="btn-success" style="flex: 1; min-width: 160px;">✅ Confirmar Pagamento</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        if (document.getElementById('totalNaoPago')) {
+            document.getElementById('totalNaoPago').innerText = `R$ ${somaPendente.toFixed(2)}`;
+        }
+        if (document.getElementById('qtdNaoPago')) {
+            document.getElementById('qtdNaoPago').innerText = totalClientesPendentes;
+        }
+
+        if (totalClientesPendentes === 0) {
+            listaNaoPagosAdmin.innerHTML = `<p style="color: #a0a0a0;">Nenhum pagamento pendente no momento.</p>`;
+        }
+    });
+}
+
+// Confirma o pagamento: muda para 'concluido' e passa a entrar no Financeiro
+window.confirmarPagamento = async function (id) {
+    const clienteRef = doc(db, "fila", id);
+    try {
+        await updateDoc(clienteRef, {
+            status: 'concluido'
+        });
+        mostrarNotificacao("Pagamento confirmado! Valor adicionado ao Financeiro.", "success");
+    } catch (error) {
+        console.error("Erro ao confirmar pagamento:", error);
+        mostrarNotificacao("Erro ao confirmar pagamento.", "error");
+    }
+}
+
+// ==========================================
+// 2. FINANCEIRO E CONTADOR DE ATENDIMENTOS (SOMENTE CONCLUÍDOS/PAGOS)
 // ==========================================
 let clientesConcluidosGlobais = [];
 
@@ -176,26 +268,22 @@ function processarFinanceiro() {
         const dataAtendimento = new Date(cliente.data + "T12:00:00");
         const valorCorte = cliente.servicos.reduce((acc, serv) => acc + serv.valor, 0);
 
-        // Soma e Contagem Diária
         if (cliente.data === diaFiltrado) {
             totalDiario += valorCorte;
             qtdAtendidosDia++;
         }
 
-        // Soma e Contagem Semanal
         if (dataAtendimento >= inicioSemana && dataAtendimento <= fimSemana) {
             totalSemanal += valorCorte;
             qtdAtendidosSemana++;
         }
 
-        // Soma e Contagem Mensal
         if (dataAtendimento.getFullYear() === anoFiltradoParaMes && dataAtendimento.getMonth() === mesFiltrado) {
             totalMensal += valorCorte;
             qtdAtendidosMes++;
         }
     });
 
-    // Atualiza Faturamento
     if (document.getElementById('balancoDiario')) {
         document.getElementById('balancoDiario').innerHTML = `R$ ${totalDiario.toFixed(2)} <br><small style="font-size:12px; color:#ccc;">${diaFormatadoTexto}</small>`;
     }
@@ -206,7 +294,6 @@ function processarFinanceiro() {
         document.getElementById('balancoMensal').innerText = `R$ ${totalMensal.toFixed(2)}`;
     }
 
-    // Atualiza Contadores de Clientes Atendidos (Concluídos)
     if (document.getElementById('contadorConcluidosDia')) {
         document.getElementById('contadorConcluidosDia').innerHTML = `${qtdAtendidosDia} <br><small style="font-size:12px; color:#ccc;">${diaFormatadoTexto}</small>`;
     }
@@ -220,6 +307,7 @@ function processarFinanceiro() {
 
 function calcularBalançoFinanceiro() {
     const filaRef = collection(db, "fila");
+    // Filtra exclusivamente status == "concluido" (não pagos ficam fora)
     const q = query(filaRef, where("status", "==", "concluido"));
 
     onSnapshot(q, (snapshot) => {
@@ -381,6 +469,8 @@ function carregarHistoricoAdmin() {
                 let statusHtml = '';
                 if (cliente.status === 'concluido') {
                     statusHtml = '<span style="color: #28a745; font-weight: bold;">✅ Concluído</span>';
+                } else if (cliente.status === 'nao_pago') {
+                    statusHtml = '<span style="color: #e67e22; font-weight: bold;">💸 Não Pago</span>';
                 } else if (cliente.status === 'ausente') {
                     statusHtml = '<span style="color: #dc3545; font-weight: bold;">❌ Ausente</span>';
                 } else if (cliente.status === 'cortando') {
@@ -473,12 +563,12 @@ const dataHoje = obterDataHojeLocal();
 if (document.getElementById('dataFilaAdmin')) document.getElementById('dataFilaAdmin').value = dataHoje;
 carregarFilaAdmin(dataHoje);
 
-// Configura os filtros financeiros (Dia, Semana e Mês) com a data atual
 const dataMesAtual = dataHoje.substring(0, 7);
 if (document.getElementById('filtroDia')) document.getElementById('filtroDia').value = dataHoje;
 if (document.getElementById('filtroSemana')) document.getElementById('filtroSemana').value = dataHoje;
 if (document.getElementById('filtroMes')) document.getElementById('filtroMes').value = dataMesAtual;
 
+carregarNaoPagosAdmin();
 calcularBalançoFinanceiro();
 carregarServicosAdmin();
 carregarDatasBloqueadas();
