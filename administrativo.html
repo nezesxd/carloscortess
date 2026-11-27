@@ -89,20 +89,13 @@
             <section id="gerenciarFila" class="tab-content active">
                 <h2>Fila de Clientes</h2>
 
-                <div style="margin-bottom: 20px; background-color: var(--sidebar-bg); padding: 15px; border-radius: 8px; border-left: 5px solid var(--gold); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                    <div style="flex: 1; min-width: 240px;">
-                        <label for="dataFilaAdmin"
-                            style="display: block; margin-bottom: 8px; color: var(--text-light); font-weight: bold;">Selecione
-                            a data da fila que deseja visualizar:</label>
-                        <input type="date" id="dataFilaAdmin" class="form-control"
-                            style="padding: 10px; border-radius: 4px; border: 1px solid #444; background: #2a2d34; color: white; width: 100%; max-width: 300px;">
-                    </div>
-
-                    <!-- CONTADOR DE CLIENTES CONCLUÍDOS NO DIA -->
-                    <div style="background: rgba(65, 184, 131, 0.12); border: 1px solid rgba(65, 184, 131, 0.35); border-radius: 8px; padding: 14px 22px; text-align: center; min-width: 190px;">
-                        <span style="display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: #9de0bd;">Clientes Atendidos</span>
-                        <strong id="contadorConcluidosDia" style="display: block; font-size: 2rem; color: #41b883; line-height: 1.1; margin-top: 4px;">0</strong>
-                    </div>
+                <div
+                    style="margin-bottom: 20px; background-color: var(--sidebar-bg); padding: 15px; border-radius: 8px; border-left: 5px solid var(--gold);">
+                    <label for="dataFilaAdmin"
+                        style="display: block; margin-bottom: 8px; color: var(--text-light); font-weight: bold;">Selecione
+                        a data da fila que deseja visualizar:</label>
+                    <input type="date" id="dataFilaAdmin" class="form-control"
+                        style="padding: 10px; border-radius: 4px; border: 1px solid #444; background: #2a2d34; color: white; width: 100%; max-width: 300px;">
                 </div>
 
                 <div id="adminFilaList">
@@ -166,10 +159,10 @@
                     style="background-color: var(--sidebar-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #28a745; display: flex; gap: 20px; flex-wrap: wrap;">
 
                     <div style="flex: 1; min-width: 200px;">
-                        <label for="filtroMes"
+                        <label for="filtroDia"
                             style="display: block; margin-bottom: 8px; color: var(--text-light); font-weight: bold;">Filtrar
-                            Mês:</label>
-                        <input type="month" id="filtroMes" class="form-control"
+                            Dia:</label>
+                        <input type="date" id="filtroDia" class="form-control"
                             style="padding: 10px; border-radius: 4px; border: 1px solid #444; background: #2a2d34; color: white; width: 100%;">
                     </div>
 
@@ -181,14 +174,28 @@
                             style="padding: 10px; border-radius: 4px; border: 1px solid #444; background: #2a2d34; color: white; width: 100%;">
                     </div>
 
+                    <div style="flex: 1; min-width: 200px;">
+                        <label for="filtroMes"
+                            style="display: block; margin-bottom: 8px; color: var(--text-light); font-weight: bold;">Filtrar
+                            Mês:</label>
+                        <input type="month" id="filtroMes" class="form-control"
+                            style="padding: 10px; border-radius: 4px; border: 1px solid #444; background: #2a2d34; color: white; width: 100%;">
+                    </div>
+
                 </div>
 
+                <h3>Faturamento</h3>
                 <div class="dashboard-cards">
+                    <div class="card">Valor Feito no Dia: <span id="balancoDiario">R$ 0,00</span></div>
                     <div class="card">Semana Filtrada: <span id="balancoSemanal">R$ 0,00</span></div>
-                    <div class="card">Mês Filtrado: <span id="balancoMensal">R$ 0,00</span></div>
-                    <div class="card">Total do Ano: <span id="balancoAnual">R$ 0,00</span></div>
-                    <div class="card">Clientes Atendidos (Mês): <span id="contadorConcluidosMes">0</span></div>
-                    <div class="card">Total de Clientes Atendidos (Geral): <span id="contadorConcluidosGeral">0</span></div>
+                    <div class="card">Valor Feito no Mês: <span id="balancoMensal">R$ 0,00</span></div>
+                </div>
+
+                <h3>Clientes Atendidos (Concluídos)</h3>
+                <div class="dashboard-cards">
+                    <div class="card" style="border-top-color: #41b883;">Atendidos no Dia: <span id="contadorConcluidosDia" style="color: #41b883;">0</span></div>
+                    <div class="card" style="border-top-color: #41b883;">Atendidos na Semana: <span id="contadorConcluidosSemana" style="color: #41b883;">0</span></div>
+                    <div class="card" style="border-top-color: #41b883;">Atendidos no Mês: <span id="contadorConcluidosMes" style="color: #41b883;">0</span></div>
                 </div>
             </section>
 
