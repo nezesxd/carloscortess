@@ -2,11 +2,10 @@ import { db } from './firebase-config.js';
 import { collection, onSnapshot, query, where, orderBy, updateDoc, doc, addDoc, deleteDoc, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ==========================================
-// 1. GERENCIAR FILA (COM FILTRO DE DATA E CONTADOR)
+// 1. GERENCIAR FILA (COM FILTRO DE DATA)
 // ==========================================
 const adminFilaList = document.getElementById('adminFilaList');
 const dataFilaAdmin = document.getElementById('dataFilaAdmin');
-const contadorConcluidosDia = document.getElementById('contadorConcluidosDia');
 
 let escutaFilaAtual = null;
 
@@ -50,17 +49,11 @@ function carregarFilaAdmin(dataSelecionada) {
         if (!adminFilaList) return;
         adminFilaList.innerHTML = '';
 
-        let totalConcluidosNoDia = 0;
         let ativosNaFila = 0;
 
         snapshot.forEach((documento) => {
             const cliente = documento.data();
             const id = documento.id;
-
-            // Conta quantos clientes foram concluídos nesta data
-            if (cliente.status === 'concluido') {
-                totalConcluidosNoDia++;
-            }
 
             if (cliente.status === 'aguardando' || cliente.status === 'cortando') {
                 ativosNaFila++;
@@ -95,11 +88,6 @@ function carregarFilaAdmin(dataSelecionada) {
             }
         });
 
-        // Atualiza o contador de clientes concluídos em tempo real
-        if (contadorConcluidosDia) {
-            contadorConcluidosDia.innerText = totalConcluidosNoDia;
-        }
-
         if (ativosNaFila === 0) {
             const partes = dataSelecionada.split('-');
             const dataFormatada = partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : dataSelecionada;
@@ -123,7 +111,7 @@ window.alterarStatus = async function (id, novoStatus) {
         });
 
         if (novoStatus === 'concluido') {
-            mostrarNotificacao("Atendimento concluído e contabilizado!", "success");
+            mostrarNotificacao("Atendimento concluído e contabilizado no Financeiro!", "success");
         } else if (novoStatus === 'cortando') {
             mostrarNotificacao("Atendimento iniciado!", "info");
         } else if (novoStatus === 'ausente') {
@@ -136,24 +124,35 @@ window.alterarStatus = async function (id, novoStatus) {
 }
 
 // ==========================================
-// 2. FINANCEIRO E CONTADOR DE ATENDIMENTOS
+// 2. FINANCEIRO E CONTADOR DE ATENDIMENTOS (DIÁRIO, SEMANAL E MENSAL)
 // ==========================================
 let clientesConcluidosGlobais = [];
 
 function processarFinanceiro() {
-    const filtroMesVal = document.getElementById('filtroMes').value;
-    const filtroSemanaVal = document.getElementById('filtroSemana').value;
+    const filtroDiaVal = document.getElementById('filtroDia') ? document.getElementById('filtroDia').value : '';
+    const filtroSemanaVal = document.getElementById('filtroSemana') ? document.getElementById('filtroSemana').value : '';
+    const filtroMesVal = document.getElementById('filtroMes') ? document.getElementById('filtroMes').value : '';
 
+    // --- LÓGICA DO DIA ---
+    const diaFiltrado = filtroDiaVal || obterDataHojeLocal();
+    const partesDia = diaFiltrado.split('-');
+    const diaFormatadoTexto = partesDia.length === 3 ? `${partesDia[2]}/${partesDia[1]}/${partesDia[0]}` : diaFiltrado;
+
+    // --- LÓGICA DA SEMANA ---
     const dataRefSemana = filtroSemanaVal ? new Date(filtroSemanaVal + "T12:00:00") : new Date();
 
     const inicioSemana = new Date(dataRefSemana);
     inicioSemana.setDate(dataRefSemana.getDate() - dataRefSemana.getDay());
+    inicioSemana.setHours(0, 0, 0, 0);
+
     const fimSemana = new Date(inicioSemana);
     fimSemana.setDate(inicioSemana.getDate() + 6);
+    fimSemana.setHours(23, 59, 59, 999);
 
     const formatoData = (data) => `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth() + 1).toString().padStart(2, '0')}/${data.getFullYear()}`;
     const nomeDaSemana = `${formatoData(inicioSemana)} a ${formatoData(fimSemana)}`;
 
+    // --- LÓGICA DO MÊS ---
     let mesFiltrado, anoFiltradoParaMes;
     if (filtroMesVal) {
         const partesMes = filtroMesVal.split('-');
@@ -165,40 +164,57 @@ function processarFinanceiro() {
         mesFiltrado = dataAtualMes.getMonth();
     }
 
-    const anoAtual = new Date().getFullYear();
-
-    let totalAnual = 0;
-    let totalMensal = 0;
+    let totalDiario = 0;
     let totalSemanal = 0;
+    let totalMensal = 0;
+
+    let qtdAtendidosDia = 0;
+    let qtdAtendidosSemana = 0;
     let qtdAtendidosMes = 0;
 
     clientesConcluidosGlobais.forEach(cliente => {
         const dataAtendimento = new Date(cliente.data + "T12:00:00");
         const valorCorte = cliente.servicos.reduce((acc, serv) => acc + serv.valor, 0);
 
-        if (dataAtendimento.getFullYear() === anoAtual) {
-            totalAnual += valorCorte;
+        // Soma e Contagem Diária
+        if (cliente.data === diaFiltrado) {
+            totalDiario += valorCorte;
+            qtdAtendidosDia++;
         }
 
+        // Soma e Contagem Semanal
+        if (dataAtendimento >= inicioSemana && dataAtendimento <= fimSemana) {
+            totalSemanal += valorCorte;
+            qtdAtendidosSemana++;
+        }
+
+        // Soma e Contagem Mensal
         if (dataAtendimento.getFullYear() === anoFiltradoParaMes && dataAtendimento.getMonth() === mesFiltrado) {
             totalMensal += valorCorte;
             qtdAtendidosMes++;
         }
-
-        if (dataAtendimento >= inicioSemana && dataAtendimento <= fimSemana) {
-            totalSemanal += valorCorte;
-        }
     });
 
-    document.getElementById('balancoSemanal').innerHTML = `R$ ${totalSemanal.toFixed(2)} <br><small style="font-size:12px; color:#ccc;">${nomeDaSemana}</small>`;
-    document.getElementById('balancoMensal').innerText = `R$ ${totalMensal.toFixed(2)}`;
-    document.getElementById('balancoAnual').innerText = `R$ ${totalAnual.toFixed(2)}`;
+    // Atualiza Faturamento
+    if (document.getElementById('balancoDiario')) {
+        document.getElementById('balancoDiario').innerHTML = `R$ ${totalDiario.toFixed(2)} <br><small style="font-size:12px; color:#ccc;">${diaFormatadoTexto}</small>`;
+    }
+    if (document.getElementById('balancoSemanal')) {
+        document.getElementById('balancoSemanal').innerHTML = `R$ ${totalSemanal.toFixed(2)} <br><small style="font-size:12px; color:#ccc;">${nomeDaSemana}</small>`;
+    }
+    if (document.getElementById('balancoMensal')) {
+        document.getElementById('balancoMensal').innerText = `R$ ${totalMensal.toFixed(2)}`;
+    }
 
+    // Atualiza Contadores de Clientes Atendidos (Concluídos)
+    if (document.getElementById('contadorConcluidosDia')) {
+        document.getElementById('contadorConcluidosDia').innerHTML = `${qtdAtendidosDia} <br><small style="font-size:12px; color:#ccc;">${diaFormatadoTexto}</small>`;
+    }
+    if (document.getElementById('contadorConcluidosSemana')) {
+        document.getElementById('contadorConcluidosSemana').innerHTML = `${qtdAtendidosSemana} <br><small style="font-size:12px; color:#ccc;">${nomeDaSemana}</small>`;
+    }
     if (document.getElementById('contadorConcluidosMes')) {
         document.getElementById('contadorConcluidosMes').innerText = qtdAtendidosMes;
-    }
-    if (document.getElementById('contadorConcluidosGeral')) {
-        document.getElementById('contadorConcluidosGeral').innerText = clientesConcluidosGlobais.length;
     }
 }
 
@@ -214,11 +230,14 @@ function calcularBalançoFinanceiro() {
     });
 }
 
-if (document.getElementById('filtroMes')) {
-    document.getElementById('filtroMes').addEventListener('change', processarFinanceiro);
+if (document.getElementById('filtroDia')) {
+    document.getElementById('filtroDia').addEventListener('change', processarFinanceiro);
 }
 if (document.getElementById('filtroSemana')) {
     document.getElementById('filtroSemana').addEventListener('change', processarFinanceiro);
+}
+if (document.getElementById('filtroMes')) {
+    document.getElementById('filtroMes').addEventListener('change', processarFinanceiro);
 }
 
 // ==========================================
@@ -454,9 +473,11 @@ const dataHoje = obterDataHojeLocal();
 if (document.getElementById('dataFilaAdmin')) document.getElementById('dataFilaAdmin').value = dataHoje;
 carregarFilaAdmin(dataHoje);
 
+// Configura os filtros financeiros (Dia, Semana e Mês) com a data atual
 const dataMesAtual = dataHoje.substring(0, 7);
-if (document.getElementById('filtroMes')) document.getElementById('filtroMes').value = dataMesAtual;
+if (document.getElementById('filtroDia')) document.getElementById('filtroDia').value = dataHoje;
 if (document.getElementById('filtroSemana')) document.getElementById('filtroSemana').value = dataHoje;
+if (document.getElementById('filtroMes')) document.getElementById('filtroMes').value = dataMesAtual;
 
 calcularBalançoFinanceiro();
 carregarServicosAdmin();
