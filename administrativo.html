@@ -41,6 +41,15 @@
                     <span>FILA</span>
                 </button>
 
+                <button class="tab-btn" onclick="showTab('naoPagos', this)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>NÃO PAGOS</span>
+                </button>
+
                 <button class="tab-btn" onclick="showTab('servicos', this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="6" cy="6" r="3"></circle>
@@ -99,6 +108,28 @@
                 </div>
 
                 <div id="adminFilaList">
+                </div>
+            </section>
+
+            <!-- NOVA ABA: NÃO PAGOS -->
+            <section id="naoPagos" class="tab-content" style="display:none;">
+                <h2>Pagamentos Pendentes (Não Pagos)</h2>
+                <p style="margin-bottom: 18px; color: var(--muted);">
+                    Valores pendentes não entram no relatório financeiro até que o pagamento seja confirmado abaixo.
+                </p>
+
+                <div style="margin-bottom: 22px; background-color: var(--sidebar-bg); padding: 18px 22px; border-radius: 8px; border-left: 5px solid #e67e22; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <span style="display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; color: #f39c12;">Total Pendente a Receber</span>
+                        <strong id="totalNaoPago" style="display: block; font-size: 2rem; color: #f5f0e7; margin-top: 4px;">R$ 0,00</strong>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);">Clientes Pendentes</span>
+                        <strong id="qtdNaoPago" style="display: block; font-size: 1.6rem; color: #f39c12; margin-top: 4px;">0</strong>
+                    </div>
+                </div>
+
+                <div id="listaNaoPagosAdmin">
                 </div>
             </section>
 
@@ -184,14 +215,14 @@
 
                 </div>
 
-                <h3>Faturamento</h3>
+                <h3>Faturamento (Apenas Pagos)</h3>
                 <div class="dashboard-cards">
                     <div class="card">Valor Feito no Dia: <span id="balancoDiario">R$ 0,00</span></div>
                     <div class="card">Semana Filtrada: <span id="balancoSemanal">R$ 0,00</span></div>
                     <div class="card">Valor Feito no Mês: <span id="balancoMensal">R$ 0,00</span></div>
                 </div>
 
-                <h3>Clientes Atendidos (Concluídos)</h3>
+                <h3>Clientes Atendidos (Concluídos e Pagos)</h3>
                 <div class="dashboard-cards">
                     <div class="card" style="border-top-color: #41b883;">Atendidos no Dia: <span id="contadorConcluidosDia" style="color: #41b883;">0</span></div>
                     <div class="card" style="border-top-color: #41b883;">Atendidos na Semana: <span id="contadorConcluidosSemana" style="color: #41b883;">0</span></div>
@@ -215,12 +246,9 @@
     <script type="module" src="js/admin.js"></script>
     <script>
         function showTab(tabId, btnElement) {
-            // Esconde todas as abas
             document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
-            // Mostra a aba clicada
             document.getElementById(tabId).style.display = 'block';
 
-            // Atualiza a borda dourada inferior na aba ativa
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             if (btnElement) {
                 btnElement.classList.add('active');
